@@ -1,0 +1,90 @@
+services:
+  # App Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        user: tailor
+        uid: 1000
+    image: tailor-on-desk-app
+    container_name: tailor-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - tailor-network
+
+  # Database Service (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: tailor-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-tailor_on_desk}
+      POSTGRES_USER: ${DB_USERNAME:-tailor}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - tailor-db-data:/var/lib/postgresql/data
+    networks:
+      - tailor-network
+
+  # Redis Service
+  redis:
+    image: redis:alpine
+    container_name: tailor-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - tailor-network
+
+  # Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        user: tailor
+        uid: 1000
+    container_name: tailor-worker
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
+    depends_on:
+      - db
+      - redis
+    networks:
+      - tailor-network
+  
+  # NEW: pgAdmin Service (Database Management Panel)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: tailor-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - tailor-network
+
+# Networks
+networks:
+  tailor-network:
+    driver: bridge
+
+# Volumes
+volumes:
+  tailor-db-data:
+    driver: local
