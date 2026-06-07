@@ -4,7 +4,12 @@ vendor
 .env
 .env.local
 .env.testing
+.env.example
 storage/*.key
+storage/logs/*.log
+storage/framework/views/*.php
+storage/framework/cache/data
+storage/framework/sessions
 .phpunit.result.cache
 .vagrant
 Homestead.json
@@ -13,6 +18,12 @@ npm-debug.log
 yarn-error.log
 .idea
 .vscode
+docs
+README.md
+*.md
 docker-compose.yml
+docker-compose.dev.yml
 Dockerfile
+Dockerfile.dev
+Dockerfile.render
 .dockerignore

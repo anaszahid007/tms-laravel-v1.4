@@ -1,43 +1,41 @@
 #!/bin/sh
 
-# Exit on error
 set -e
 
-# Wait for database to be ready
+# Wait for database
 echo "Waiting for database..."
 while ! nc -z db 5432; do
   sleep 1
 done
 echo "Database is ready!"
 
-# Wait for redis to be ready
+# Wait for redis
 echo "Waiting for redis..."
 while ! nc -z redis 6379; do
   sleep 1
 done
 echo "Redis is ready!"
 
-# Install composer dependencies if not already installed
-if [ ! -d "vendor" ]; then
-    echo "Installing composer dependencies..."
-    composer install --no-interaction --optimize-autoloader
-fi
-
-# Generate key if not already generated
+# Generate key if not set
 if [ -z "$APP_KEY" ]; then
     echo "Generating app key..."
-    php artisan key:generate
+    php artisan key:generate --force
 fi
 
 # Run migrations
 echo "Running migrations..."
 php artisan migrate --force
 
-# If arguments are passed, execute them, otherwise start Laravel server
+# Cache config, routes, views for speed
+echo "Optimizing..."
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# If arguments are passed (e.g. queue:work), run them
 if [ $# -gt 0 ]; then
-    echo "Executing command: $@"
     exec "$@"
 else
-    echo "Starting Laravel Development Server..."
+    echo "Starting Laravel server..."
     exec php artisan serve --host=0.0.0.0 --port=8000
 fi
