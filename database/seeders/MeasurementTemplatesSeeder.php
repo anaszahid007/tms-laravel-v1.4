@@ -98,15 +98,20 @@ class MeasurementTemplatesSeeder extends Seeder
         ];
 
         foreach ($templates as $templateData) {
-            $template = MeasurementTemplate::create([
-                'type' => $templateData['type'],
-                'name' => $templateData['name'],
-                'name_urdu' => $templateData['name_urdu'],
-                'is_active' => true,
-            ]);
+            $template = MeasurementTemplate::updateOrCreate(
+                ['type' => $templateData['type']],
+                [
+                    'name' => $templateData['name'],
+                    'name_urdu' => $templateData['name_urdu'],
+                    'is_active' => true,
+                ]
+            );
 
             foreach ($templateData['columns'] as $columnData) {
-                $template->columns()->create($columnData);
+                $template->columns()->updateOrCreate(
+                    ['field_name' => $columnData['field_name']],
+                    $columnData
+                );
             }
         }
     }

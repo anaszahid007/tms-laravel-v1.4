@@ -102,7 +102,10 @@ class SubscriptionPlanSeeder extends Seeder
         ];
 
         foreach ($plans as $plan) {
-            SubscriptionPlan::create($plan);
+            SubscriptionPlan::updateOrCreate(
+                ['slug' => $plan['slug']],
+                $plan
+            );
         }
 
         $this->command->info('✅ Subscription plans seeded successfully!');

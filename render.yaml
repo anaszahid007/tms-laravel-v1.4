@@ -1,0 +1,96 @@
+# Render Blueprint Specification for TailorOnDesk
+# Reference: https://render.com/docs/blueprints
+
+databases:
+  # Managed PostgreSQL Database
+  - name: tailor-db
+    plan: free
+    postgresMajorVersion: 15
+
+services:
+  # Managed Redis (Valkey) Instance
+  - type: redis
+    name: tailor-redis
+    plan: free
+
+  # Web Application Service (Laravel + FrankenPHP)
+  - type: web
+    name: tailor-web
+    env: docker
+    dockerfilePath: Dockerfile.render
+    plan: free
+    envVars:
+      # Laravel Environment Settings
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true # Render will automatically generate a secure 32-character key
+
+      # Database Configuration (Injected from Postgres database)
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: tailor-db
+          property: connectionString
+
+      # Cache & Queues (Injected from Redis service)
+      - key: REDIS_URL
+        fromService:
+          name: tailor-redis
+          type: redis
+          property: connectionString
+      - key: CACHE_STORE
+        value: redis
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+
+      # Production Seeding Admin Credentials
+      - key: ADMIN_EMAIL
+        value: admin@gmail.com # Change this in the Render dashboard if desired
+      - key: ADMIN_PASSWORD
+        generateValue: true # Render will automatically generate a secure random password for security
+
+  # Background Queue Worker Service
+  - type: worker
+    name: tailor-worker
+    env: docker
+    dockerfilePath: Dockerfile.render
+    dockerCommand: php artisan queue:work --tries=3 --timeout=90
+    plan: free
+    envVars:
+      # Inherits Laravel Key from Web Service
+      - key: APP_KEY
+        fromService:
+          name: tailor-web
+          property: envVar:APP_KEY
+      
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+
+      # Database Configuration
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: tailor-db
+          property: connectionString
+
+      # Cache & Queues
+      - key: REDIS_URL
+        fromService:
+          name: tailor-redis
+          type: redis
+          property: connectionString
+      - key: CACHE_STORE
+        value: redis
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis

@@ -1,0 +1,74 @@
+# ==============================================================================
+# STAGE 1: Build Frontend Assets
+# ==============================================================================
+FROM node:20-alpine AS asset-builder
+
+WORKDIR /app
+
+# Copy package configuration
+COPY package*.json ./
+
+# Install packages
+RUN npm ci
+
+# Copy Vite / CSS configs
+COPY tailwind.config.js postcss.config.js vite.config.js ./
+COPY resources/ ./resources/
+COPY public/ ./public/
+
+# Compile assets (creates public/build)
+RUN npm run build
+
+# ==============================================================================
+# STAGE 2: PHP Production Runtime
+# ==============================================================================
+FROM dunglas/frankenphp:1.2-php8.2-alpine
+
+# Install essential system dependencies
+RUN apk add --no-cache \
+    bash \
+    postgresql-client \
+    git \
+    unzip
+
+# Install PHP extensions using standard helper script
+RUN install-php-extensions \
+    pdo_pgsql \
+    pgsql \
+    gd \
+    zip \
+    opcache \
+    bcmath \
+    exif \
+    pcntl
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+# Copy application code (excluding files in .dockerignore / .gitignore)
+COPY . /app
+
+# Copy built assets from Stage 1
+COPY --from=asset-builder /app/public/build /app/public/build
+
+# Install production PHP dependencies
+ENV COMPOSER_ALLOW_SUPERUSER=1
+RUN composer install --no-dev --no-interaction --optimize-autoloader
+
+# Clean up dev tools
+RUN rm -rf /root/.composer /root/.npm
+
+# Copy production entrypoint script
+COPY docker-compose/entrypoint.render.sh /usr/local/bin/entrypoint.render.sh
+RUN chmod +x /usr/local/bin/entrypoint.render.sh
+
+# Configure FrankenPHP document root for Laravel
+ENV FRANKENPHP_DOCUMENT_ROOT=/app/public
+
+# Expose port (FrankenPHP respects PORT variable, which Render sets)
+ENV PORT=8000
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.render.sh"]
